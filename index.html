@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ludo Royale</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="app-shell">
+    <section class="game-panel" aria-label="Ludo game board">
+      <div class="topbar">
+        <div>
+          <p class="eyebrow">Pure HTML CSS JavaScript</p>
+          <h1>Ludo Royale</h1>
+        </div>
+        <div class="status-pill" id="gameStatus">Choose mode and start</div>
+      </div>
+
+      <div class="board-wrap">
+        <div class="board" id="board" aria-label="Ludo board"></div>
+      </div>
+    </section>
+
+    <aside class="control-panel" aria-label="Game controls">
+      <section class="setup-card">
+        <h2>Match Setup</h2>
+        <div class="field-group">
+          <label for="modeSelect">Mode</label>
+          <select id="modeSelect">
+            <option value="ai">Single player vs AI</option>
+            <option value="local">Local multiplayer</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label for="playerCount">Players</label>
+          <select id="playerCount">
+            <option value="2">2 players</option>
+            <option value="3">3 players</option>
+            <option value="4" selected>4 players</option>
+          </select>
+        </div>
+        <div class="button-row">
+          <button class="primary-btn" id="startBtn" type="button">Start Game</button>
+          <button class="ghost-btn" id="restartBtn" type="button">Restart</button>
+        </div>
+      </section>
+
+      <section class="turn-card" aria-live="polite">
+        <div class="turn-header">
+          <span id="turnLabel">No active turn</span>
+          <span class="mini-badge" id="rollHint">Roll first</span>
+        </div>
+        <button class="dice" id="diceBtn" type="button" aria-label="Roll dice">
+          <span id="diceFace">?</span>
+        </button>
+        <p class="message" id="message">Set your players, then begin.</p>
+      </section>
+
+      <section class="score-card">
+        <h2>Scoreboard</h2>
+        <div class="scoreboard" id="scoreboard"></div>
+      </section>
+    </aside>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="script.js"></script>
+</body>
+</html>
