@@ -82,6 +82,7 @@ let lastRoll = null;
 let canRoll = false;
 let awaitingMove = false;
 let gameOver = false;
+let gameStarted = false;
 let audioCtx = null;
 let boardTurnBadge = null;
 let boardDiceButtons = new Map();
@@ -183,6 +184,7 @@ function isInsideYard(row, col) {
 }
 
 function createGame() {
+  gameStarted = true;
   updateGameControls();
   if (currentGame === "snake") {
     createSnakeGame();
@@ -190,6 +192,39 @@ function createGame() {
   }
   initBoard();
   createLudoGame();
+}
+
+function showGamePreview() {
+  gameStarted = false;
+  gameOver = false;
+  canRoll = false;
+  awaitingMove = false;
+  players = [];
+  tokens = [];
+  snakePieces = [];
+  boardDiceButtons = new Map();
+  activeSnakeJumpFrom = null;
+  snakeAnimatingPlayerId = null;
+  snakeMotionType = "";
+  updateGameControls();
+  gameTitle.textContent = currentGame === "snake" ? "Snakes and Ladders" : "Ludo Royale";
+  statusEl.textContent = "Choose mode and start";
+  messageEl.textContent = "Start Game dabao.";
+  turnLabel.textContent = "No active turn";
+  rollHint.textContent = "Roll first";
+  diceBtn.disabled = true;
+  renderDiceFace(diceFace, "?");
+  scoreboardEl.innerHTML = "";
+  if (currentGame === "snake") {
+    playerCountSelect.value = "2";
+    boardEl.innerHTML = "";
+    boardEl.className = "snake-board";
+    snakeCells = new Map();
+    buildSnakeBoard();
+  } else {
+    initBoard();
+  }
+  updateStartButton();
 }
 
 function getSelectedPlayers() {
@@ -542,6 +577,7 @@ function animateSnakeJump(piece, target, wentUp, onDone) {
 function finishSnakeMove(piece) {
   if (piece.position === 100) {
     gameOver = true;
+    updateStartButton();
     canRoll = false;
     piece.finished = true;
     messageEl.textContent = `${currentPlayer().name} wins Snakes and Ladders.`;
@@ -661,6 +697,12 @@ function updateTurnUi() {
   rollHint.classList.toggle("active", !gameOver);
   document.documentElement.style.setProperty("--active-color", player.color);
   updateBoardDice();
+  updateStartButton();
+}
+
+function updateStartButton() {
+  startBtn.disabled = gameStarted;
+  startBtn.textContent = gameStarted ? "Game Started" : "Start Game";
 }
 
 function updateBoardDice() {
@@ -875,6 +917,7 @@ function concludePlayer(player) {
       activePlayers[0].active = false;
     }
     gameOver = true;
+    updateStartButton();
     canRoll = false;
     awaitingMove = false;
     const champion = players.find((item) => item.rank === 1);
@@ -979,13 +1022,20 @@ function showToast(text) {
 
 diceBtn.addEventListener("click", () => rollDice());
 startBtn.addEventListener("click", createGame);
-restartBtn.addEventListener("click", createGame);
+restartBtn.addEventListener("click", () => {
+  showGamePreview();
+  showToast("Game reset ho gaya. Ab game choose karke Start Game dabao.");
+});
 gameTabs.forEach((tab) => {
   tab.addEventListener("click", () => {
+    if (gameStarted) {
+      showToast("Naya game start karne ke liye Restart dabao");
+      return;
+    }
     currentGame = tab.dataset.game;
     gameTabs.forEach((item) => item.classList.toggle("active", item === tab));
     updateGameControls();
-    createGame();
+    showGamePreview();
   });
 });
 modeSelect.addEventListener("change", () => {
@@ -993,4 +1043,4 @@ modeSelect.addEventListener("change", () => {
   playerCountSelect.value = isAi ? playerCountSelect.value : playerCountSelect.value;
 });
 
-createGame();
+showGamePreview();
