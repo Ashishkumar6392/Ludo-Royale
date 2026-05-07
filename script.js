@@ -85,6 +85,9 @@ let gameOver = false;
 let audioCtx = null;
 let boardTurnBadge = null;
 let boardDiceButtons = new Map();
+let snakeAnimatingPlayerId = null;
+let snakeMotionType = "";
+let activeSnakeJumpFrom = null;
 
 function key(row, col) {
   return `${row}-${col}`;
@@ -169,17 +172,7 @@ function initBoard() {
   boardTurnBadge = makeDiv("board-turn-badge", boardEl);
   boardTurnBadge.textContent = "Start game";
 
-  PLAYERS.forEach((player) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = `board-dice ${player.id} hidden`;
-    button.dataset.playerId = player.id;
-    renderDiceFace(button, "?");
-    button.setAttribute("aria-label", `${player.name} dice`);
-    button.addEventListener("click", () => rollDice(player.id));
-    boardEl.appendChild(button);
-    boardDiceButtons.set(player.id, button);
-  });
+  createBoardDiceButtons();
 }
 
 function isInsideYard(row, col) {
@@ -190,6 +183,7 @@ function isInsideYard(row, col) {
 }
 
 function createGame() {
+  updateGameControls();
   if (currentGame === "snake") {
     createSnakeGame();
     return;
@@ -199,7 +193,7 @@ function createGame() {
 }
 
 function getSelectedPlayers() {
-  const count = Number(playerCountSelect.value);
+  const count = currentGame === "snake" ? 2 : Number(playerCountSelect.value);
   const mode = modeSelect.value;
   const playerOrder = count === 2
     ? ["red", "yellow"]
@@ -244,6 +238,7 @@ function createLudoGame() {
 }
 
 function createSnakeGame() {
+  playerCountSelect.value = "2";
   boardEl.innerHTML = "";
   boardEl.className = "snake-board";
   cells = new Map();
@@ -251,6 +246,9 @@ function createSnakeGame() {
   boardDiceButtons = new Map();
   snakeCells = new Map();
   boardTurnBadge = null;
+  snakeAnimatingPlayerId = null;
+  snakeMotionType = "";
+  activeSnakeJumpFrom = null;
   players = getSelectedPlayers();
   snakePieces = players.map((player) => ({
     playerId: player.id,
@@ -259,6 +257,7 @@ function createSnakeGame() {
   }));
 
   buildSnakeBoard();
+  createBoardDiceButtons();
   currentPlayerIndex = 0;
   lastRoll = null;
   canRoll = true;
@@ -273,6 +272,28 @@ function createSnakeGame() {
   maybeAiTurn();
 }
 
+function createBoardDiceButtons() {
+  PLAYERS.forEach((player) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `board-dice ${player.id} hidden`;
+    button.dataset.playerId = player.id;
+    renderDiceFace(button, "?");
+    button.setAttribute("aria-label", `${player.name} dice`);
+    button.addEventListener("click", () => rollDice(player.id));
+    boardEl.appendChild(button);
+    boardDiceButtons.set(player.id, button);
+  });
+}
+
+function updateGameControls() {
+  const isSnakeGame = currentGame === "snake";
+  playerCountSelect.disabled = isSnakeGame;
+  if (isSnakeGame) {
+    playerCountSelect.value = "2";
+  }
+}
+
 function buildSnakeBoard() {
   for (let row = 0; row < 10; row += 1) {
     for (let col = 0; col < 10; col += 1) {
@@ -280,17 +301,26 @@ function buildSnakeBoard() {
       const cell = makeDiv("snake-cell", boardEl);
       cell.style.gridRow = row + 1;
       cell.style.gridColumn = col + 1;
-      cell.textContent = number;
+      const numberEl = document.createElement("span");
+      numberEl.className = "snake-number";
+      numberEl.textContent = number;
+      cell.appendChild(numberEl);
       if (SNAKE_JUMPS[number]) {
-        const marker = document.createElement("span");
+        const isLadder = SNAKE_JUMPS[number] > number;
+        const marker = document.createElement("img");
         marker.className = "snake-marker";
-        marker.textContent = SNAKE_JUMPS[number] > number ? "L" : "S";
-        cell.classList.add(SNAKE_JUMPS[number] > number ? "jump-up" : "jump-down");
+        marker.src = isLadder ? "assets/ladder-icon.svg" : "assets/snake-icon.svg";
+        marker.alt = isLadder ? "Ladder" : "Snake";
+        marker.title = isLadder
+          ? `Ladder: ${number} to ${SNAKE_JUMPS[number]}`
+          : `Snake: ${number} to ${SNAKE_JUMPS[number]}`;
+        cell.classList.add(isLadder ? "jump-up" : "jump-down");
         cell.appendChild(marker);
       }
       snakeCells.set(number, cell);
     }
   }
+  addSnakeConnections();
 }
 
 function snakeNumberForCell(row, col) {
@@ -298,13 +328,135 @@ function snakeNumberForCell(row, col) {
   return row % 2 === 0 ? base + (10 - col) : base + col + 1;
 }
 
+function snakeCellCenter(number) {
+  const row = 9 - Math.floor((number - 1) / 10);
+  const base = (9 - row) * 10;
+  const col = row % 2 === 0 ? base + 10 - number : number - base - 1;
+  return {
+    x: (col + 0.5) * 10,
+    y: (row + 0.5) * 10
+  };
+}
+
+function addSnakeConnections() {
+  boardEl.querySelectorAll(".snake-links").forEach((links) => links.remove());
+  const svgNS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(svgNS, "svg");
+  svg.classList.add("snake-links");
+  svg.setAttribute("viewBox", "0 0 100 100");
+  svg.setAttribute("preserveAspectRatio", "none");
+
+  Object.entries(SNAKE_JUMPS).forEach(([fromValue, toValue]) => {
+    const from = Number(fromValue);
+    const to = Number(toValue);
+    const start = snakeCellCenter(from);
+    const end = snakeCellCenter(to);
+    const isLadder = to > from;
+
+    if (isLadder) {
+      drawLadderLink(svg, start, end, from, to, activeSnakeJumpFrom === from);
+    } else {
+      drawSnakeLink(svg, start, end, from, to, activeSnakeJumpFrom === from);
+    }
+  });
+
+  boardEl.appendChild(svg);
+}
+
+function drawSnakeLink(svg, start, end, from, to, isActive = false) {
+  const svgNS = "http://www.w3.org/2000/svg";
+  const group = document.createElementNS(svgNS, "g");
+  group.classList.add("snake-link", "snake-link-down");
+  if (isActive) group.classList.add("active-jump");
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const bend = dx >= 0 ? 12 : -12;
+  const path = document.createElementNS(svgNS, "path");
+  path.setAttribute("d", `M ${start.x} ${start.y} C ${start.x + bend} ${start.y + dy * 0.28}, ${end.x - bend} ${end.y - dy * 0.28}, ${end.x} ${end.y}`);
+  path.setAttribute("vector-effect", "non-scaling-stroke");
+  group.appendChild(path);
+  group.appendChild(makeSvgCircle(start.x, start.y, "snake-head"));
+  group.appendChild(makeSvgCircle(end.x, end.y, "snake-tail"));
+  group.appendChild(makeSvgLabel(end.x, end.y, to));
+  svg.appendChild(group);
+}
+
+function drawLadderLink(svg, start, end, from, to, isActive = false) {
+  const svgNS = "http://www.w3.org/2000/svg";
+  const group = document.createElementNS(svgNS, "g");
+  group.classList.add("snake-link", "snake-link-up");
+  if (isActive) group.classList.add("active-jump");
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const length = Math.hypot(dx, dy) || 1;
+  const offsetX = (-dy / length) * 1.2;
+  const offsetY = (dx / length) * 1.2;
+
+  [
+    [offsetX, offsetY],
+    [-offsetX, -offsetY]
+  ].forEach(([ox, oy]) => {
+    const rail = document.createElementNS(svgNS, "line");
+    rail.setAttribute("x1", start.x + ox);
+    rail.setAttribute("y1", start.y + oy);
+    rail.setAttribute("x2", end.x + ox);
+    rail.setAttribute("y2", end.y + oy);
+    rail.setAttribute("vector-effect", "non-scaling-stroke");
+    group.appendChild(rail);
+  });
+
+  for (let step = 1; step <= 5; step += 1) {
+    const t = step / 6;
+    const cx = start.x + dx * t;
+    const cy = start.y + dy * t;
+    const rung = document.createElementNS(svgNS, "line");
+    rung.classList.add("ladder-rung");
+    rung.setAttribute("x1", cx + offsetX * 1.5);
+    rung.setAttribute("y1", cy + offsetY * 1.5);
+    rung.setAttribute("x2", cx - offsetX * 1.5);
+    rung.setAttribute("y2", cy - offsetY * 1.5);
+    rung.setAttribute("vector-effect", "non-scaling-stroke");
+    group.appendChild(rung);
+  }
+
+  group.appendChild(makeSvgCircle(start.x, start.y, "ladder-foot"));
+  group.appendChild(makeSvgCircle(end.x, end.y, "ladder-top"));
+  group.appendChild(makeSvgLabel(end.x, end.y, to));
+  svg.appendChild(group);
+}
+
+function makeSvgCircle(x, y, className) {
+  const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+  circle.classList.add(className);
+  circle.setAttribute("cx", x);
+  circle.setAttribute("cy", y);
+  circle.setAttribute("r", 1.35);
+  circle.setAttribute("vector-effect", "non-scaling-stroke");
+  return circle;
+}
+
+function makeSvgLabel(x, y, value) {
+  const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+  text.classList.add("snake-link-label");
+  text.setAttribute("x", x);
+  text.setAttribute("y", y - 2.4);
+  text.setAttribute("text-anchor", "middle");
+  text.textContent = value;
+  return text;
+}
+
 function renderSnakeAll() {
   document.querySelectorAll(".snake-piece").forEach((piece) => piece.remove());
+  document.querySelectorAll(".snake-cell.active-jump-cell").forEach((cell) => cell.classList.remove("active-jump-cell"));
+  if (activeSnakeJumpFrom && snakeCells.has(activeSnakeJumpFrom)) {
+    snakeCells.get(activeSnakeJumpFrom).classList.add("active-jump-cell");
+  }
   snakePieces.forEach((piece, index) => {
     const cell = snakeCells.get(piece.position);
     if (!cell) return;
     const el = document.createElement("span");
-    el.className = `snake-piece ${piece.playerId} slot-${index}`;
+    const motionClass = piece.playerId === snakeAnimatingPlayerId ? ` ${snakeMotionType}` : "";
+    el.className = `snake-piece ${piece.playerId} slot-${index}${motionClass}`;
     cell.appendChild(el);
   });
   renderScoreboard();
@@ -321,26 +473,70 @@ function afterSnakeRoll() {
     return;
   }
 
-  piece.position = target;
-  playTone(420, 0.08, "sine");
-  renderSnakeAll();
-
-  const jump = SNAKE_JUMPS[piece.position];
-  if (jump) {
-    window.setTimeout(() => {
+  messageEl.textContent = `${currentPlayer().name} chal raha hai...`;
+  animateSnakeStepMove(piece, target, () => {
+    const jump = SNAKE_JUMPS[piece.position];
+    if (jump) {
       const wentUp = jump > piece.position;
-      piece.position = jump;
-      renderSnakeAll();
-      showToast(wentUp ? "Ladder!" : "Snake!");
-      messageEl.textContent = wentUp
-        ? `${currentPlayer().name} ladder se ${jump} par gaya.`
-        : `${currentPlayer().name} snake se ${jump} par aa gaya.`;
-      finishSnakeMove(piece);
-    }, 450);
-    return;
-  }
+      window.setTimeout(() => {
+        animateSnakeJump(piece, jump, wentUp, () => {
+          showToast(wentUp ? "Ladder!" : "Snake!");
+          messageEl.textContent = wentUp
+            ? `${currentPlayer().name} ladder chadhkar ${jump} par gaya.`
+            : `${currentPlayer().name} snake ki tail se ${jump} par aa gaya.`;
+          finishSnakeMove(piece);
+        });
+      }, 280);
+      return;
+    }
 
-  finishSnakeMove(piece);
+    finishSnakeMove(piece);
+  });
+}
+
+function animateSnakeStepMove(piece, target, onDone) {
+  snakeAnimatingPlayerId = piece.playerId;
+  snakeMotionType = "moving";
+  const step = target > piece.position ? 1 : -1;
+
+  const tick = () => {
+    if (piece.position === target) {
+      snakeAnimatingPlayerId = null;
+      snakeMotionType = "";
+      renderSnakeAll();
+      onDone();
+      return;
+    }
+
+    piece.position += step;
+    renderSnakeAll();
+    playTone(360 + (piece.position % 5) * 24, 0.035, "sine");
+    window.setTimeout(tick, 140);
+  };
+
+  tick();
+}
+
+function animateSnakeJump(piece, target, wentUp, onDone) {
+  snakeAnimatingPlayerId = piece.playerId;
+  snakeMotionType = wentUp ? "climbing" : "sliding";
+  activeSnakeJumpFrom = piece.position;
+  addSnakeConnections();
+  renderSnakeAll();
+  playTone(wentUp ? 620 : 170, 0.12, wentUp ? "triangle" : "sawtooth");
+
+  window.setTimeout(() => {
+    piece.position = target;
+    renderSnakeAll();
+    window.setTimeout(() => {
+      snakeAnimatingPlayerId = null;
+      snakeMotionType = "";
+      activeSnakeJumpFrom = null;
+      addSnakeConnections();
+      renderSnakeAll();
+      onDone();
+    }, 360);
+  }, 420);
 }
 
 function finishSnakeMove(piece) {
@@ -781,13 +977,14 @@ function showToast(text) {
   showToast.timer = window.setTimeout(() => toastEl.classList.remove("show"), 1500);
 }
 
-diceBtn.addEventListener("click", rollDice);
+diceBtn.addEventListener("click", () => rollDice());
 startBtn.addEventListener("click", createGame);
 restartBtn.addEventListener("click", createGame);
 gameTabs.forEach((tab) => {
   tab.addEventListener("click", () => {
     currentGame = tab.dataset.game;
     gameTabs.forEach((item) => item.classList.toggle("active", item === tab));
+    updateGameControls();
     createGame();
   });
 });

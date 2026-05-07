@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="ladder">
+  <defs>
+    <linearGradient id="wood" x1="18" x2="78" y1="8" y2="88" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f4c06c"/>
+      <stop offset=".5" stop-color="#c47a2c"/>
+      <stop offset="1" stop-color="#8c4c1f"/>
+    </linearGradient>
+    <filter id="ladderShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#3b210d" flood-opacity=".28"/>
+    </filter>
+  </defs>
+  <g filter="url(#ladderShadow)" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M29 85 43 10M64 85 78 10" fill="none" stroke="url(#wood)" stroke-width="9"/>
+    <path d="M39 23h35M36 38h35M33 53h35M30 68h35" fill="none" stroke="#e6a64f" stroke-width="8"/>
+    <path d="M39 23h35M36 38h35M33 53h35M30 68h35" fill="none" stroke="#fff0c8" stroke-width="2" opacity=".55"/>
+  </g>
+  <path d="M32 83 45 13M67 83 80 13" fill="none" stroke="#6f3916" stroke-width="2" stroke-linecap="round" opacity=".45"/>
+</svg>

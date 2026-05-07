@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="snake">
+  <defs>
+    <linearGradient id="snakeBody" x1="20" x2="78" y1="12" y2="84" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#64d66f"/>
+      <stop offset=".52" stop-color="#1f9d55"/>
+      <stop offset="1" stop-color="#0f6f3c"/>
+    </linearGradient>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#06351d" flood-opacity=".32"/>
+    </filter>
+  </defs>
+  <path d="M67 15c11 5 13 18 4 27-7 7-20 6-28 13-6 5-5 12 2 14 8 2 17-2 23 4 6 6 2 15-6 17-14 4-34-3-39-17-4-12 2-23 14-28 9-4 22-5 25-13 2-5-1-9-6-11-5-2-11 0-16 2" fill="none" stroke="url(#snakeBody)" stroke-width="13" stroke-linecap="round" stroke-linejoin="round" filter="url(#softShadow)"/>
+  <path d="M65 14c8 1 15 6 17 13 1 5-2 10-7 12-7 3-16-3-17-10-1-6 1-12 7-15z" fill="#1f9d55"/>
+  <circle cx="72" cy="25" r="2.5" fill="#061b12"/>
+  <circle cx="62" cy="23" r="2.5" fill="#061b12"/>
+  <path d="M79 32c5 2 8 2 12 0-3 4-7 6-12 4" fill="#ef4444"/>
+  <path d="M41 22c-6 9-6 15 0 22M58 34c-5 4-10 6-17 7M34 61c8 4 15 4 23 0M47 77c8 2 14 1 20-3" fill="none" stroke="#b8f7b9" stroke-width="3" stroke-linecap="round" opacity=".7"/>
+</svg>
