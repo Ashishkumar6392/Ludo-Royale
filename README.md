@@ -1,9 +1,11 @@
 # Ludo Royale
 
-A complete browser-based multiplayer Ludo game built with pure HTML, CSS, and JavaScript.
+A browser-based board game collection built with pure HTML, CSS, and JavaScript.
 
 ## Features
 
+- Ludo Royale game
+- Snakes and Ladders game
 - 2 to 4 players
 - Single player vs AI
 - Local multiplayer

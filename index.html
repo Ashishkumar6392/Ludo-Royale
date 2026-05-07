@@ -12,7 +12,7 @@
       <div class="topbar">
         <div>
           <p class="eyebrow">Pure HTML CSS JavaScript</p>
-          <h1>Ludo Royale</h1>
+          <h1 id="gameTitle">Ludo Royale</h1>
         </div>
         <div class="status-pill" id="gameStatus">Choose mode and start</div>
       </div>
@@ -25,6 +25,10 @@
     <aside class="control-panel" aria-label="Game controls">
       <section class="setup-card">
         <h2>Match Setup</h2>
+        <div class="game-tabs" aria-label="Game selection">
+          <button class="game-tab active" type="button" data-game="ludo">Ludo</button>
+          <button class="game-tab" type="button" data-game="snake">Snakes and Ladders</button>
+        </div>
         <div class="field-group">
           <label for="modeSelect">Mode</label>
           <select id="modeSelect">

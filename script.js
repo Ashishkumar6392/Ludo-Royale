@@ -36,6 +36,24 @@ const FINISH_CELLS = {
   blue: [[8, 6]]
 };
 
+const SNAKE_JUMPS = {
+  4: 25,
+  13: 46,
+  33: 49,
+  42: 63,
+  50: 69,
+  62: 81,
+  74: 92,
+  27: 5,
+  40: 3,
+  43: 18,
+  54: 31,
+  66: 45,
+  76: 58,
+  89: 53,
+  99: 41
+};
+
 const boardEl = document.getElementById("board");
 const scoreboardEl = document.getElementById("scoreboard");
 const diceBtn = document.getElementById("diceBtn");
@@ -49,9 +67,14 @@ const modeSelect = document.getElementById("modeSelect");
 const playerCountSelect = document.getElementById("playerCount");
 const startBtn = document.getElementById("startBtn");
 const restartBtn = document.getElementById("restartBtn");
+const gameTitle = document.getElementById("gameTitle");
+const gameTabs = document.querySelectorAll(".game-tab");
 
 let cells = new Map();
 let yardSlots = new Map();
+let snakeCells = new Map();
+let snakePieces = [];
+let currentGame = "ludo";
 let players = [];
 let tokens = [];
 let currentPlayerIndex = 0;
@@ -76,6 +99,7 @@ function makeDiv(className, parent) {
 
 function initBoard() {
   boardEl.innerHTML = "";
+  boardEl.className = "board";
   cells = new Map();
   yardSlots = new Map();
   boardDiceButtons = new Map();
@@ -166,6 +190,15 @@ function isInsideYard(row, col) {
 }
 
 function createGame() {
+  if (currentGame === "snake") {
+    createSnakeGame();
+    return;
+  }
+  initBoard();
+  createLudoGame();
+}
+
+function getSelectedPlayers() {
   const count = Number(playerCountSelect.value);
   const mode = modeSelect.value;
   const playerOrder = count === 2
@@ -174,7 +207,7 @@ function createGame() {
       ? ["red", "green", "yellow"]
       : ["red", "green", "yellow", "blue"];
 
-  players = playerOrder.map((playerId, index) => {
+  return playerOrder.map((playerId, index) => {
     const player = PLAYERS.find((item) => item.id === playerId);
     return {
       ...player,
@@ -183,6 +216,10 @@ function createGame() {
       rank: null
     };
   });
+}
+
+function createLudoGame() {
+  players = getSelectedPlayers();
 
   tokens = players.flatMap((player) => Array.from({ length: 4 }, (_, index) => ({
     id: `${player.id}-${index}`,
@@ -197,12 +234,138 @@ function createGame() {
   canRoll = true;
   awaitingMove = false;
   gameOver = false;
+  gameTitle.textContent = "Ludo Royale";
   syncDiceFaces("?");
   messageEl.textContent = "Roll the dice to begin.";
   statusEl.textContent = `${players.length} players ready`;
   renderAll();
   updateTurnUi();
   maybeAiTurn();
+}
+
+function createSnakeGame() {
+  boardEl.innerHTML = "";
+  boardEl.className = "snake-board";
+  cells = new Map();
+  yardSlots = new Map();
+  boardDiceButtons = new Map();
+  snakeCells = new Map();
+  boardTurnBadge = null;
+  players = getSelectedPlayers();
+  snakePieces = players.map((player) => ({
+    playerId: player.id,
+    position: 1,
+    finished: false
+  }));
+
+  buildSnakeBoard();
+  currentPlayerIndex = 0;
+  lastRoll = null;
+  canRoll = true;
+  awaitingMove = false;
+  gameOver = false;
+  gameTitle.textContent = "Snakes and Ladders";
+  syncDiceFaces("?");
+  messageEl.textContent = "Dice roll karo aur 100 tak pahucho.";
+  statusEl.textContent = `${players.length} players ready`;
+  renderSnakeAll();
+  updateTurnUi();
+  maybeAiTurn();
+}
+
+function buildSnakeBoard() {
+  for (let row = 0; row < 10; row += 1) {
+    for (let col = 0; col < 10; col += 1) {
+      const number = snakeNumberForCell(row, col);
+      const cell = makeDiv("snake-cell", boardEl);
+      cell.style.gridRow = row + 1;
+      cell.style.gridColumn = col + 1;
+      cell.textContent = number;
+      if (SNAKE_JUMPS[number]) {
+        const marker = document.createElement("span");
+        marker.className = "snake-marker";
+        marker.textContent = SNAKE_JUMPS[number] > number ? "L" : "S";
+        cell.classList.add(SNAKE_JUMPS[number] > number ? "jump-up" : "jump-down");
+        cell.appendChild(marker);
+      }
+      snakeCells.set(number, cell);
+    }
+  }
+}
+
+function snakeNumberForCell(row, col) {
+  const base = (9 - row) * 10;
+  return row % 2 === 0 ? base + (10 - col) : base + col + 1;
+}
+
+function renderSnakeAll() {
+  document.querySelectorAll(".snake-piece").forEach((piece) => piece.remove());
+  snakePieces.forEach((piece, index) => {
+    const cell = snakeCells.get(piece.position);
+    if (!cell) return;
+    const el = document.createElement("span");
+    el.className = `snake-piece ${piece.playerId} slot-${index}`;
+    cell.appendChild(el);
+  });
+  renderScoreboard();
+}
+
+function afterSnakeRoll() {
+  const piece = snakePieces.find((item) => item.playerId === currentPlayer().id);
+  const target = piece.position + lastRoll;
+  statusEl.textContent = `${currentPlayer().name} ne ${lastRoll} roll kiya`;
+  if (target > 100) {
+    messageEl.textContent = `${currentPlayer().name} ko exact ${100 - piece.position} chahiye.`;
+    playTone(120, 0.12, "sawtooth");
+    window.setTimeout(nextTurn, 850);
+    return;
+  }
+
+  piece.position = target;
+  playTone(420, 0.08, "sine");
+  renderSnakeAll();
+
+  const jump = SNAKE_JUMPS[piece.position];
+  if (jump) {
+    window.setTimeout(() => {
+      const wentUp = jump > piece.position;
+      piece.position = jump;
+      renderSnakeAll();
+      showToast(wentUp ? "Ladder!" : "Snake!");
+      messageEl.textContent = wentUp
+        ? `${currentPlayer().name} ladder se ${jump} par gaya.`
+        : `${currentPlayer().name} snake se ${jump} par aa gaya.`;
+      finishSnakeMove(piece);
+    }, 450);
+    return;
+  }
+
+  finishSnakeMove(piece);
+}
+
+function finishSnakeMove(piece) {
+  if (piece.position === 100) {
+    gameOver = true;
+    canRoll = false;
+    piece.finished = true;
+    messageEl.textContent = `${currentPlayer().name} wins Snakes and Ladders.`;
+    statusEl.textContent = `${currentPlayer().name} wins`;
+    diceBtn.disabled = true;
+    renderSnakeAll();
+    playWin();
+    return;
+  }
+
+  if (lastRoll === 6) {
+    canRoll = true;
+    messageEl.textContent = `${currentPlayer().name} ko six mila, ek aur roll.`;
+    updateTurnUi();
+    maybeAiTurn();
+    return;
+  }
+
+  messageEl.textContent = `${currentPlayer().name} ${piece.position} par hai. Next turn.`;
+  window.setTimeout(nextTurn, 650);
 }
 
 function renderAll() {
@@ -269,16 +432,19 @@ function stackTransform(total, offset) {
 function renderScoreboard() {
   scoreboardEl.innerHTML = "";
   players.forEach((player, index) => {
-    const finished = tokens.filter((token) => token.playerId === player.id && token.finished).length;
+    const snakePiece = snakePieces.find((piece) => piece.playerId === player.id);
+    const finished = currentGame === "snake"
+      ? snakePiece?.position || 1
+      : tokens.filter((token) => token.playerId === player.id && token.finished).length;
     const row = document.createElement("div");
     row.className = `score-row ${index === currentPlayerIndex && !gameOver ? "active" : ""} ${player.active ? "" : "inactive"}`;
     row.innerHTML = `
       <span class="score-dot" style="background:${player.color}"></span>
       <span>
         <span class="score-name">${player.name}${player.ai ? " AI" : ""}</span>
-        <span class="score-meta">${player.rank ? `Rank #${player.rank}` : "Tokens home"}</span>
+        <span class="score-meta">${currentGame === "snake" ? "Board position" : player.rank ? `Rank #${player.rank}` : "Tokens home"}</span>
       </span>
-      <span class="score-count">${finished}/4</span>
+      <span class="score-count">${currentGame === "snake" ? finished : `${finished}/4`}</span>
     `;
     scoreboardEl.appendChild(row);
   });
@@ -384,7 +550,11 @@ function rollDice(playerId = null) {
       lastRoll = Math.floor(Math.random() * 6) + 1;
       syncDiceFaces(lastRoll);
       setDiceRolling(false);
-      afterRoll();
+      if (currentGame === "snake") {
+        afterSnakeRoll();
+      } else {
+        afterRoll();
+      }
     }
   }, 55);
 }
@@ -532,7 +702,11 @@ function nextTurn() {
     currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
   } while (!currentPlayer().active);
   messageEl.textContent = `${currentPlayer().name}'s turn. Roll the dice.`;
-  renderAll();
+  if (currentGame === "snake") {
+    renderSnakeAll();
+  } else {
+    renderAll();
+  }
   updateTurnUi();
   maybeAiTurn();
 }
@@ -610,10 +784,16 @@ function showToast(text) {
 diceBtn.addEventListener("click", rollDice);
 startBtn.addEventListener("click", createGame);
 restartBtn.addEventListener("click", createGame);
+gameTabs.forEach((tab) => {
+  tab.addEventListener("click", () => {
+    currentGame = tab.dataset.game;
+    gameTabs.forEach((item) => item.classList.toggle("active", item === tab));
+    createGame();
+  });
+});
 modeSelect.addEventListener("change", () => {
   const isAi = modeSelect.value === "ai";
   playerCountSelect.value = isAi ? playerCountSelect.value : playerCountSelect.value;
 });
 
-initBoard();
 createGame();
